@@ -1,0 +1,105 @@
+spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  application:
+    name: housing-rental-platform
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/housing_rental?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
+  flyway:
+    enabled: false
+  ai:
+    embedding:
+      transformer:
+        onnx:
+          model-uri: ${EMBEDDING_MODEL_URI:https://huggingface.co/onnx-community/bge-small-zh-v1.5-ONNX/resolve/main/onnx/model.onnx}
+        cache:
+          directory: ${EMBEDDING_CACHE_DIRECTORY:.runtime/models}
+        tokenizer:
+          uri: ${EMBEDDING_TOKENIZER_URI:https://huggingface.co/onnx-community/bge-small-zh-v1.5-ONNX/resolve/main/tokenizer.json}
+          options:
+            padding: true
+    model:
+      chat: ${AI_CHAT_MODEL:none}
+      embedding: ${AI_EMBEDDING_MODEL:none}
+    openai:
+      api-key: ${AI_API_KEY:disabled}
+      base-url: ${AI_BASE_URL:https://api.openai.com}
+      chat:
+        options:
+          model: ${AI_MODEL:gpt-4.1-mini}
+          temperature: 0.5
+          extra-body:
+            thinking:
+              type: ${AI_THINKING_MODE:disabled}
+    vectorstore:
+      type: ${AI_VECTOR_STORE:none}
+      chroma:
+        enabled: ${CHROMA_ENABLED:false}
+        client:
+          host: ${CHROMA_HOST:http://127.0.0.1}
+          port: ${CHROMA_PORT:8000}
+        collection-name: housing-rag
+        initialize-schema: ${CHROMA_INITIALIZE_SCHEMA:true}
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+    default-fetch-size: 100
+    default-statement-timeout: 10
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      cache:
+        time-to-live: 10s
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,ragVector
+
+app:
+  ai:
+    retrieval:
+      similarity-threshold: ${AI_SIMILARITY_THRESHOLD:0.58}
+    agent:
+      timeout: ${AI_AGENT_TIMEOUT:30s}
+      max-tool-calls: ${AI_AGENT_MAX_TOOL_CALLS:6}
+    stream:
+      timeout: ${AI_STREAM_TIMEOUT:60s}
+      max-concurrent: ${AI_STREAM_MAX_CONCURRENT:50}
+  jwt:
+    secret: ${JWT_SECRET:change-this-development-secret-at-least-32-bytes}
+    issuer: housing-rental-platform
+    access-ttl: 2h
+    refresh-ttl: 7d
+  oss:
+    endpoint: ${OSS_ENDPOINT:}
+    access-key-id: ${OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+    bucket-name: ${OSS_BUCKET_NAME:}
+    public-base-url: ${OSS_PUBLIC_BASE_URL:}

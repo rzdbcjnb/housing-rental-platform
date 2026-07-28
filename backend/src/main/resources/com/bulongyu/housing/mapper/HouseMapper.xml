@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bulongyu.housing.mapper.HouseMapper">
+    <sql id="columns">
+        h.id, h.title, h.description, h.price, h.area, h.rooms,
+        h.bedroom_count, h.living_room_count, h.bathroom_count, h.kitchen_count,
+        h.house_type, h.region_id, h.address_detail, h.image, h.landlord_id,
+        h.status, h.click_count, h.is_active AS active, h.create_time, h.update_time,
+        r.name AS region_name, d.name AS district_name, c.name AS city_name,
+        u.id AS landlord_user_id, u.username AS landlord_username,
+        p.phone AS landlord_phone, p.avatar AS landlord_avatar
+    </sql>
+    <sql id="joins">
+        FROM house h
+        LEFT JOIN area r ON r.id = h.region_id
+        LEFT JOIN area d ON d.id = r.parent_id
+        LEFT JOIN area c ON c.id = d.parent_id
+        JOIN user_profile p ON p.id = h.landlord_id
+        JOIN auth_user u ON u.id = p.user_id
+    </sql>
+    <sql id="publicFilters">
+        h.status = 'approved' AND h.is_active = TRUE
+        <if test="q.normalizedKeyword() != null">
+            AND (LOWER(h.title) LIKE LOWER(CONCAT('%', #{q.keyword}, '%'))
+              OR LOWER(h.description) LIKE LOWER(CONCAT('%', #{q.keyword}, '%'))
+              OR LOWER(r.name) LIKE LOWER(CONCAT('%', #{q.keyword}, '%'))
+              OR LOWER(d.name) LIKE LOWER(CONCAT('%', #{q.keyword}, '%'))
+              OR LOWER(c.name) LIKE LOWER(CONCAT('%', #{q.keyword}, '%')))
+        </if>
+        <if test="q.normalizedCity() != null">AND c.name = #{q.city}</if>
+        <if test="q.normalizedDistrict() != null">AND d.name = #{q.district}</if>
+        <if test="q.normalizedStreet() != null">AND r.name = #{q.street}</if>
+        <if test="q.priceMin != null">AND h.price &gt;= #{q.priceMin}</if>
+        <if test="q.priceMax != null">AND h.price &lt;= #{q.priceMax}</if>
+        <if test="q.normalizedRooms() != null">
+            AND LOWER(h.rooms) LIKE LOWER(CONCAT('%', #{q.rooms}, '%'))
+        </if>
+        <if test="q.areaMin != null">AND h.area &gt;= #{q.areaMin}</if>
+        <if test="q.areaMax != null">AND h.area &lt;= #{q.areaMax}</if>
+        <if test="q.normalizedHouseType() != null">AND h.house_type = #{q.houseType}</if>
+        <if test="q.bedroomMin != null">AND h.bedroom_count &gt;= #{q.bedroomMin}</if>
+        <if test="q.livingRoomMin != null">AND h.living_room_count &gt;= #{q.livingRoomMin}</if>
+        <if test="q.bathroomMin != null">AND h.bathroom_count &gt;= #{q.bathroomMin}</if>
+        <if test="q.kitchenMin != null">AND h.kitchen_count &gt;= #{q.kitchenMin}</if>
+    </sql>
+    <select id="countPublic" resultType="long">
+        SELECT COUNT(*) <include refid="joins"/> WHERE <include refid="publicFilters"/>
+    </select>
+    <select id="latestPublicUpdateTime" resultType="java.time.LocalDateTime">
+        SELECT MAX(h.update_time)
+        FROM house h
+        WHERE h.status = 'approved' AND h.is_active = TRUE
+    </select>
+    <select id="findPublic" resultType="com.bulongyu.housing.entity.HouseRow">
+        SELECT <include refid="columns"/> <include refid="joins"/>
+        WHERE <include refid="publicFilters"/>
+        ORDER BY h.create_time DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="findById" resultType="com.bulongyu.housing.entity.HouseRow">
+        SELECT <include refid="columns"/> <include refid="joins"/> WHERE h.id = #{id}
+    </select>
+    <select id="countByLandlord" resultType="long">
+        SELECT COUNT(*) FROM house h WHERE h.landlord_id = #{landlordId}
+        <if test="keyword != null and keyword != ''">
+            AND (LOWER(h.title) LIKE LOWER(CONCAT('%', #{keyword}, '%'))
+              OR LOWER(h.description) LIKE LOWER(CONCAT('%', #{keyword}, '%')))
+        </if>
+    </select>
+    <select id="findByLandlord" resultType="com.bulongyu.housing.entity.HouseRow">
+        SELECT <include refid="columns"/> <include refid="joins"/>
+        WHERE h.landlord_id = #{landlordId}
+        <if test="keyword != null and keyword != ''">
+            AND (LOWER(h.title) LIKE LOWER(CONCAT('%', #{keyword}, '%'))
+              OR LOWER(h.description) LIKE LOWER(CONCAT('%', #{keyword}, '%')))
+        </if>
+        ORDER BY h.create_time DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO house
+            (title, description, price, area, rooms, bedroom_count, living_room_count,
+             bathroom_count, kitchen_count, house_type, region_id, address_detail, image,
+             landlord_id, status, click_count, is_active, create_time, update_time)
+        VALUES
+            (#{title}, #{description}, #{price}, #{area}, #{rooms}, #{bedroomCount},
+             #{livingRoomCount}, #{bathroomCount}, #{kitchenCount}, #{houseType}, #{regionId},
+             #{addressDetail}, #{image}, #{landlordId}, #{status}, #{clickCount}, #{active},
+             #{createTime}, #{updateTime})
+    </insert>
+    <update id="update">
+        UPDATE house SET title = #{title}, description = #{description}, price = #{price},
+            area = #{area}, rooms = #{rooms}, bedroom_count = #{bedroomCount},
+            living_room_count = #{livingRoomCount}, bathroom_count = #{bathroomCount},
+            kitchen_count = #{kitchenCount}, house_type = #{houseType}, region_id = #{regionId},
+            address_detail = #{addressDetail}, image = #{image}, status = #{status},
+            is_active = #{active}, update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+    <delete id="delete">DELETE FROM house WHERE id = #{id}</delete>
+    <update id="updateStatus">
+        UPDATE house SET status = #{status}, is_active = #{active}, update_time = #{now}
+        WHERE id = #{id}
+    </update>
+</mapper>

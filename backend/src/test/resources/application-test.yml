@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:housing_test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  flyway:
+    enabled: false
+  sql:
+    init:
+      mode: always
+  data:
+    redis:
+      repositories:
+        enabled: false
+  ai:
+    model:
+      chat: none
+      embedding: none
+    vectorstore:
+      type: none
+      chroma:
+        enabled: false
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+
+management:
+  health:
+    redis:
+      enabled: false

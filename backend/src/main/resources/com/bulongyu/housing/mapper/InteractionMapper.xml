@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bulongyu.housing.mapper.InteractionMapper">
+    <sql id="interactionColumns">
+        x.id, x.create_time, h.id AS house_id, h.title, h.price, h.area, h.rooms, h.image,
+        r.name AS region_name, d.name AS district_name, c.name AS city_name
+    </sql>
+    <sql id="houseJoins">
+        JOIN house h ON h.id = x.house_id
+        LEFT JOIN area r ON r.id = h.region_id
+        LEFT JOIN area d ON d.id = r.parent_id
+        LEFT JOIN area c ON c.id = d.parent_id
+    </sql>
+
+    <select id="findFavoriteId" resultType="long">
+        SELECT id FROM favorite WHERE user_id = #{userId} AND house_id = #{houseId}
+    </select>
+    <insert id="insertFavorite" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO favorite (user_id, house_id, create_time)
+        VALUES (#{userId}, #{houseId}, #{createTime})
+    </insert>
+    <delete id="deleteFavorite">
+        DELETE FROM favorite WHERE id = #{id} AND user_id = #{userId}
+    </delete>
+    <select id="countFavorites" resultType="long">
+        SELECT COUNT(*) FROM favorite WHERE user_id = #{userId}
+    </select>
+    <select id="findFavorites" resultType="com.bulongyu.housing.entity.InteractionRow">
+        SELECT <include refid="interactionColumns"/> FROM favorite x
+        <include refid="houseJoins"/> WHERE x.user_id = #{userId}
+        ORDER BY x.create_time DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="findHistoryId" resultType="long">
+        SELECT id FROM browse_history WHERE user_id = #{userId} AND house_id = #{houseId}
+    </select>
+    <insert id="insertHistory" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO browse_history (user_id, house_id, create_time)
+        VALUES (#{userId}, #{houseId}, #{createTime})
+    </insert>
+    <update id="touchHistory">
+        UPDATE browse_history SET create_time = #{createTime} WHERE id = #{id}
+    </update>
+    <delete id="deleteHistory">
+        DELETE FROM browse_history WHERE id = #{id} AND user_id = #{userId}
+    </delete>
+    <delete id="clearHistory">
+        DELETE FROM browse_history WHERE user_id = #{userId}
+    </delete>
+    <select id="countHistory" resultType="long">
+        SELECT COUNT(*) FROM browse_history WHERE user_id = #{userId}
+    </select>
+    <select id="findHistory" resultType="com.bulongyu.housing.entity.InteractionRow">
+        SELECT <include refid="interactionColumns"/> FROM browse_history x
+        <include refid="houseJoins"/> WHERE x.user_id = #{userId}
+        ORDER BY x.create_time DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+</mapper>

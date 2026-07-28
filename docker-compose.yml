@@ -1,0 +1,43 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  chroma:
+    image: chromadb/chroma:1.0.0
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/data
+
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      DB_URL: ${DOCKER_DB_URL:-jdbc:mysql://host.docker.internal:3306/housing_rental?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+      REDIS_HOST: redis
+      CHROMA_HOST: http://chroma
+      EMBEDDING_MODEL_URI: file:/app/.runtime/models/bge-small-zh-v1.5/model_quantized.onnx
+      EMBEDDING_TOKENIZER_URI: file:/app/.runtime/models/bge-small-zh-v1.5/tokenizer.json
+      EMBEDDING_CACHE_DIRECTORY: /app/.runtime/models/cache
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./.runtime/models:/app/.runtime/models:ro
+      - ./model_quantized.onnx_data:/app/model_quantized.onnx_data:ro
+    depends_on:
+      - redis
+      - chroma
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  chroma-data:

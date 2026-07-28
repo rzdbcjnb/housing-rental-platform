@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: housing-stage0-baseline
+  main:
+    web-application-type: servlet
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  flyway:
+    enabled: false
+  sql:
+    init:
+      mode: never
+  data:
+    redis:
+      repositories:
+        enabled: false
+  ai:
+    model:
+      chat: none
+      embedding: none
+    vectorstore:
+      type: none
+      chroma:
+        enabled: false
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+    default-fetch-size: 100
+    default-statement-timeout: 10
+
+app:
+  jwt:
+    secret: stage0-baseline-test-secret-only-32-bytes-minimum
+    issuer: housing-stage0-baseline
+    access-ttl: 2h
+    refresh-ttl: 7d
+
+management:
+  health:
+    redis:
+      enabled: false

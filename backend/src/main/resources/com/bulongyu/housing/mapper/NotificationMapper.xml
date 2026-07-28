@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bulongyu.housing.mapper.NotificationMapper">
+    <sql id="messageFilters">
+        recipient_id = #{recipientId}
+        <if test="type != null and type != ''">AND message_type = #{type}</if>
+        <if test="read != null">AND is_read = #{read}</if>
+    </sql>
+    <select id="countMessages" resultType="long">
+        SELECT COUNT(*) FROM message WHERE <include refid="messageFilters"/>
+    </select>
+    <select id="findMessages"
+            resultType="com.bulongyu.housing.entity.NotificationMessageRow">
+        SELECT m.id, m.message_type, m.title, m.content, m.is_read AS `read`, m.create_time,
+               COALESCE(sender_user.username, '\u7cfb\u7edf') AS sender_name,
+               m.related_house_id, h.title AS related_house_title
+        FROM message m
+        LEFT JOIN user_profile sender ON sender.id = m.sender_id
+        LEFT JOIN auth_user sender_user ON sender_user.id = sender.user_id
+        LEFT JOIN house h ON h.id = m.related_house_id
+        WHERE <include refid="messageFilters"/>
+        ORDER BY m.create_time DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="unreadCount" resultType="long">
+        SELECT COUNT(*) FROM message WHERE recipient_id = #{recipientId} AND is_read = FALSE
+    </select>
+    <insert id="insertMessage" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO message
+            (recipient_id, sender_id, message_type, title, content, is_read,
+             related_house_id, create_time)
+        VALUES (#{recipientId}, #{senderId}, #{messageType}, #{title}, #{content},
+                #{read}, #{relatedHouseId}, #{createTime})
+    </insert>
+    <update id="markMessageRead">
+        UPDATE message SET is_read = TRUE WHERE id = #{id} AND recipient_id = #{recipientId}
+    </update>
+    <update id="markAllRead">
+        UPDATE message SET is_read = TRUE WHERE recipient_id = #{recipientId} AND is_read = FALSE
+    </update>
+    <delete id="deleteMessage">
+        DELETE FROM message WHERE id = #{id} AND recipient_id = #{recipientId}
+    </delete>
+    <select id="findAllProfileIds" resultType="long">
+        SELECT id FROM user_profile
+    </select>
+    <select id="findAdminProfileIds" resultType="long">
+        SELECT id FROM user_profile WHERE role = 'admin'
+    </select>
+
+    <select id="countAnnouncements" resultType="long">
+        SELECT COUNT(*) FROM announcement
+    </select>
+    <select id="findAnnouncements"
+            resultType="com.bulongyu.housing.entity.AnnouncementRow">
+        SELECT a.id, a.title, a.content, u.username AS author_name,
+               a.is_active AS active, a.create_time, a.update_time
+        FROM announcement a JOIN user_profile p ON p.id = a.author_id
+        JOIN auth_user u ON u.id = p.user_id
+        ORDER BY a.create_time DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="findAnnouncement"
+            resultType="com.bulongyu.housing.entity.AnnouncementRow">
+        SELECT a.id, a.title, a.content, u.username AS author_name,
+               a.is_active AS active, a.create_time, a.update_time
+        FROM announcement a JOIN user_profile p ON p.id = a.author_id
+        JOIN auth_user u ON u.id = p.user_id WHERE a.id = #{id}
+    </select>
+    <insert id="insertAnnouncement" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO announcement
+            (title, content, author_id, is_active, create_time, update_time)
+        VALUES (#{title}, #{content}, #{authorId}, #{active}, #{createTime}, #{updateTime})
+    </insert>
+    <update id="updateAnnouncement">
+        UPDATE announcement SET title = #{title}, content = #{content},
+            is_active = #{active}, update_time = #{updateTime} WHERE id = #{id}
+    </update>
+    <delete id="deleteAnnouncement">DELETE FROM announcement WHERE id = #{id}</delete>
+    <delete id="deleteAnnouncements">
+        DELETE FROM announcement WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+</mapper>

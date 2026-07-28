@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bulongyu.housing.mapper.CommerceMapper">
+    <select id="countHouses" resultType="long">
+        SELECT COUNT(*) FROM house WHERE landlord_id = #{profileId}
+    </select>
+    <select id="findUnusedPaymentForUpdate"
+            resultType="com.bulongyu.housing.entity.PaymentRecord">
+        SELECT id, user_id, house_id, amount, is_paid AS paid, created_at
+        FROM publish_record
+        WHERE user_id = #{profileId} AND is_paid = TRUE AND house_id IS NULL
+        ORDER BY created_at DESC LIMIT 1 FOR UPDATE
+    </select>
+    <insert id="insertPayment" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO publish_record (user_id, house_id, amount, is_paid, created_at)
+        VALUES (#{userId}, #{houseId}, #{amount}, #{paid}, #{createdAt})
+    </insert>
+    <update id="linkPayment">
+        UPDATE publish_record SET house_id = #{houseId}
+        WHERE id = #{id} AND house_id IS NULL AND is_paid = TRUE
+    </update>
+    <delete id="deletePaymentForHouse">
+        DELETE FROM publish_record WHERE house_id = #{houseId}
+    </delete>
+
+    <select id="findAccount" resultType="com.bulongyu.housing.entity.PointAccount">
+        SELECT id, user_id, balance, total_purchased, total_invested, created_at, updated_at
+        FROM recommend_point_account WHERE user_id = #{profileId}
+    </select>
+    <select id="findAccountForUpdate" resultType="com.bulongyu.housing.entity.PointAccount">
+        SELECT id, user_id, balance, total_purchased, total_invested, created_at, updated_at
+        FROM recommend_point_account WHERE user_id = #{profileId} FOR UPDATE
+    </select>
+    <insert id="insertAccount" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO recommend_point_account
+            (user_id, balance, total_purchased, total_invested, created_at, updated_at)
+        VALUES (#{userId}, #{balance}, #{totalPurchased}, #{totalInvested},
+                #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="updateAccount">
+        UPDATE recommend_point_account SET balance = #{balance},
+            total_purchased = #{totalPurchased}, total_invested = #{totalInvested},
+            updated_at = #{updatedAt} WHERE id = #{id}
+    </update>
+
+    <select id="findRecommendPointForUpdate"
+            resultType="com.bulongyu.housing.entity.RecommendPoint">
+        SELECT id, house_id, points, created_at, updated_at
+        FROM recommend_point WHERE house_id = #{houseId} FOR UPDATE
+    </select>
+    <insert id="insertRecommendPoint" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO recommend_point (house_id, points, created_at, updated_at)
+        VALUES (#{houseId}, #{points}, #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="updateRecommendPoint">
+        UPDATE recommend_point SET points = #{points}, updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+    <insert id="insertPurchase">
+        INSERT INTO point_purchase_record (user_id, house_id, points, amount, created_at)
+        VALUES (#{userId}, #{houseId}, #{points}, #{amount}, #{createdAt})
+    </insert>
+    <select id="findRecommendStatus"
+            resultType="com.bulongyu.housing.entity.RecommendStatusRow">
+        SELECT h.id AS house_id, h.title, h.status, COALESCE(rp.points, 0) AS points,
+               h.click_count
+        FROM house h LEFT JOIN recommend_point rp ON rp.house_id = h.id
+        WHERE h.landlord_id = #{profileId} ORDER BY h.create_time DESC
+    </select>
+
+    <update id="incrementClick">
+        UPDATE house SET click_count = click_count + 1 WHERE id = #{houseId}
+    </update>
+    <select id="findClickCount" resultType="integer">
+        SELECT click_count FROM house WHERE id = #{houseId}
+    </select>
+</mapper>

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bulongyu.housing.mapper.ChatMapper">
+    <sql id="roomColumns">
+        r.id, r.room_type, r.name, r.house_id, h.title AS house_title, h.image AS house_image,
+        op.userprofile_id AS other_profile_id, ou.id AS other_user_id,
+        ou.username AS other_username, other.avatar AS other_avatar,
+        COALESCE(os.is_online, FALSE) AS other_online,
+        lm.id AS last_message_id, lm.content AS last_content,
+        lm.message_type AS last_message_type, lu.username AS last_sender_name,
+        lm.created_at AS last_message_at,
+        (SELECT COUNT(*) FROM chat_message unread
+         WHERE unread.room_id = r.id AND unread.is_read = FALSE
+           AND unread.is_deleted = FALSE AND unread.sender_id != #{profileId}) AS unread_count,
+        r.created_at, r.updated_at
+    </sql>
+    <sql id="roomJoins">
+        JOIN chat_room_participants selfp ON selfp.chatroom_id = r.id
+            AND selfp.userprofile_id = #{profileId}
+        LEFT JOIN chat_room_participants op ON op.chatroom_id = r.id
+            AND op.userprofile_id != #{profileId}
+        LEFT JOIN user_profile other ON other.id = op.userprofile_id
+        LEFT JOIN auth_user ou ON ou.id = other.user_id
+        LEFT JOIN online_status os ON os.user_id = other.id
+        LEFT JOIN house h ON h.id = r.house_id
+        LEFT JOIN chat_message lm ON lm.id = (
+            SELECT MAX(lastm.id) FROM chat_message lastm
+            WHERE lastm.room_id = r.id AND lastm.is_deleted = FALSE)
+        LEFT JOIN user_profile lp ON lp.id = lm.sender_id
+        LEFT JOIN auth_user lu ON lu.id = lp.user_id
+    </sql>
+
+    <select id="countRooms" resultType="long">
+        SELECT COUNT(DISTINCT r.id) FROM chat_room r
+        JOIN chat_room_participants p ON p.chatroom_id = r.id
+        WHERE p.userprofile_id = #{profileId}
+    </select>
+    <select id="findRooms" resultType="com.bulongyu.housing.entity.RoomRow">
+        SELECT <include refid="roomColumns"/> FROM chat_room r
+        <include refid="roomJoins"/>
+        ORDER BY COALESCE(lm.created_at, r.updated_at) DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="findRoom" resultType="com.bulongyu.housing.entity.RoomRow">
+        SELECT <include refid="roomColumns"/> FROM chat_room r
+        <include refid="roomJoins"/> WHERE r.id = #{roomId}
+    </select>
+    <select id="findExistingPrivateRoom" resultType="long">
+        SELECT r.id FROM chat_room r
+        JOIN chat_room_participants p1 ON p1.chatroom_id = r.id
+            AND p1.userprofile_id = #{firstProfileId}
+        JOIN chat_room_participants p2 ON p2.chatroom_id = r.id
+            AND p2.userprofile_id = #{secondProfileId}
+        WHERE r.room_type = 'private' ORDER BY r.updated_at DESC LIMIT 1
+    </select>
+    <insert id="insertRoom" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO chat_room (room_type, name, house_id, created_at, updated_at)
+        VALUES (#{roomType}, #{name}, #{houseId}, #{createdAt}, #{updatedAt})
+    </insert>
+    <insert id="insertParticipant">
+        INSERT INTO chat_room_participants (chatroom_id, userprofile_id)
+        VALUES (#{roomId}, #{profileId})
+    </insert>
+    <update id="touchRoom">
+        UPDATE chat_room SET updated_at = #{updatedAt} WHERE id = #{roomId}
+    </update>
+    <select id="countParticipant" resultType="integer">
+        SELECT COUNT(*) FROM chat_room_participants
+        WHERE chatroom_id = #{roomId} AND userprofile_id = #{profileId}
+    </select>
+
+    <select id="countMessages" resultType="long">
+        SELECT COUNT(*) FROM chat_message WHERE room_id = #{roomId} AND is_deleted = FALSE
+    </select>
+    <select id="findMessages" resultType="com.bulongyu.housing.entity.ChatMessageRow">
+        SELECT m.id, m.room_id, m.sender_id, u.id AS sender_user_id, u.username AS sender_name,
+               p.avatar AS sender_avatar, m.message_type, m.content, m.is_read AS `read`, m.created_at
+        FROM chat_message m JOIN user_profile p ON p.id = m.sender_id
+        JOIN auth_user u ON u.id = p.user_id
+        WHERE m.room_id = #{roomId} AND m.is_deleted = FALSE
+        ORDER BY m.created_at DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="findMessagesByIds" resultType="com.bulongyu.housing.entity.ChatMessageRow">
+        SELECT m.id, m.room_id, m.sender_id, u.id AS sender_user_id, u.username AS sender_name,
+               p.avatar AS sender_avatar, m.message_type, m.content, m.is_read AS `read`, m.created_at
+        FROM chat_message m JOIN user_profile p ON p.id = m.sender_id
+        JOIN auth_user u ON u.id = p.user_id
+        WHERE m.room_id = #{roomId} AND m.is_deleted = FALSE
+          AND m.id IN
+          <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY m.created_at
+    </select>
+    <insert id="insertMessage" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO chat_message
+            (room_id, sender_id, message_type, content, is_read, is_deleted,
+             is_recalled, recall_reason, recalled_at, created_at)
+        VALUES (#{roomId}, #{senderId}, #{messageType}, #{content}, #{read}, #{deleted},
+                #{recalled}, #{recallReason}, #{recalledAt}, #{createdAt})
+    </insert>
+    <update id="markRead">
+        UPDATE chat_message SET is_read = TRUE
+        WHERE room_id = #{roomId} AND sender_id != #{readerProfileId}
+          AND is_read = FALSE AND is_deleted = FALSE
+    </update>
+    <update id="markReadByIds">
+        UPDATE chat_message SET is_read = TRUE
+        WHERE room_id = #{roomId} AND sender_id != #{readerProfileId}
+          AND is_deleted = FALSE AND id IN
+          <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+    <select id="unreadCount" resultType="long">
+        SELECT COUNT(*) FROM chat_message m
+        JOIN chat_room_participants p ON p.chatroom_id = m.room_id
+        WHERE p.userprofile_id = #{profileId} AND m.sender_id != #{profileId}
+          AND m.is_read = FALSE AND m.is_deleted = FALSE
+    </select>
+
+    <select id="findOnlineStatusId" resultType="long">
+        SELECT id FROM online_status WHERE user_id = #{profileId}
+    </select>
+    <insert id="insertOnlineStatus">
+        INSERT INTO online_status (user_id, is_online, last_seen)
+        VALUES (#{profileId}, #{online}, #{lastSeen})
+    </insert>
+    <update id="updateOnlineStatus">
+        UPDATE online_status SET is_online = #{online}, last_seen = #{lastSeen} WHERE id = #{id}
+    </update>
+</mapper>
